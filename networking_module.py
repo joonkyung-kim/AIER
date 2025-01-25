@@ -1,5 +1,9 @@
 import socket
 import threading
+import cv2
+import struct
+import numpy as np
+
 
 class TCPClient:
     def __init__(self, server_address, server_port):
@@ -69,6 +73,33 @@ class TCPClient:
             self.socket.close()
             self.is_connected = False
             print("Disconnected from the server.")
+
+    def receive_video_stream(self, display_callback):
+        """Receive video frames and call the display callback."""
+        if not self.is_connected:
+            print("Not connected to the server.")
+            return
+
+        try:
+            while True:
+                # Receive frame size
+                packed_size = self.socket.recv(4)
+                if not packed_size:
+                    break
+                frame_size = struct.unpack(">L", packed_size)[0]
+
+                # Receive frame data
+                frame_data = b""
+                while len(frame_data) < frame_size:
+                    frame_data += self.socket.recv(frame_size - len(frame_data))
+
+                # Decode and display the frame
+                frame = cv2.imdecode(np.frombuffer(frame_data, dtype=np.uint8), cv2.IMREAD_COLOR)
+                if frame is not None:
+                    display_callback(frame)
+        except Exception as e:
+            print(f"Error receiving video stream: {e}")
+
 
 # Example Usage
 if __name__ == "__main__":
