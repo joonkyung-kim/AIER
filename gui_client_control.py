@@ -25,93 +25,147 @@ class ClientControlApp:
         self.last_frame_times = []  # For stable FPS calculation
         self.fps_label = None
 
-        # UI Elements
-        self.create_ui()
+        # Add a BooleanVar for "calibrate" if you need keyboard calibration
+        self.calibrate_var = tk.BooleanVar(value=False)
 
-    def create_ui(self):
-        # Server connection controls
-        tk.Label(self.root, text="Server Address:").grid(row=0, column=0, padx=5, pady=5)
-        self.server_address_entry = tk.Entry(self.root, width=15)
+        # Create the main frames
+        self.create_main_frames()
+
+        # Bind keys (if you want robot control via keyboard)
+        self.root.bind("<KeyPress>", self.on_key_press)
+        self.root.bind("<KeyRelease>", self.on_key_release)
+
+    def create_main_frames(self):
+        """
+        Create two main frames, side by side:
+          - left_frame  for server controls, video, crosshair, etc.
+          - right_frame for the log.
+        """
+        # This main_frame will contain left_frame and right_frame side by side
+        self.main_frame = tk.Frame(self.root)
+        self.main_frame.pack(fill="both", expand=True)
+
+        # Left side frame
+        self.left_frame = tk.Frame(self.main_frame)
+        self.left_frame.pack(side="left", fill="y", padx=5, pady=5)
+
+        # Right side frame (for the log)
+        self.right_frame = tk.Frame(self.main_frame)
+        self.right_frame.pack(side="right", fill="both", expand=True, padx=5, pady=5)
+
+        # Now build the left_frame's layout with grid
+        self.create_left_side_ui()
+
+        # Create the log in the right_frame
+        self.create_log_ui()
+
+    def create_left_side_ui(self):
+        """
+        Build the controls (connection, video, crosshair, etc.) in left_frame using grid.
+        """
+        # Row 0: Server connection
+        row_idx = 0
+        tk.Label(self.left_frame, text="Server Address:").grid(row=row_idx, column=0, padx=5, pady=2, sticky="e")
+        self.server_address_entry = tk.Entry(self.left_frame, width=15)
         self.server_address_entry.insert(0, "localhost")
-        self.server_address_entry.grid(row=0, column=1, padx=5, pady=5)
+        self.server_address_entry.grid(row=row_idx, column=1, padx=5, pady=2)
 
-        tk.Label(self.root, text="Server Port:").grid(row=0, column=2, padx=5, pady=5)
-        self.server_port_entry = tk.Entry(self.root, width=10)
+        tk.Label(self.left_frame, text="Server Port:").grid(row=row_idx, column=2, padx=5, pady=2, sticky="e")
+        self.server_port_entry = tk.Entry(self.left_frame, width=10)
         self.server_port_entry.insert(0, "5000")
-        self.server_port_entry.grid(row=0, column=3, padx=5, pady=5)
+        self.server_port_entry.grid(row=row_idx, column=3, padx=5, pady=2)
 
-        self.connect_button = tk.Button(self.root, text="Connect", command=self.connect_to_server)
-        self.connect_button.grid(row=0, column=4, padx=5, pady=5)
+        self.connect_button = tk.Button(self.left_frame, text="Connect", command=self.connect_to_server)
+        self.connect_button.grid(row=row_idx, column=4, padx=5, pady=2)
 
         self.disconnect_button = tk.Button(
-            self.root, text="Disconnect", command=self.disconnect_from_server, state=tk.DISABLED
+            self.left_frame, text="Disconnect", command=self.disconnect_from_server, state=tk.DISABLED
         )
-        self.disconnect_button.grid(row=0, column=5, padx=5, pady=5)
+        self.disconnect_button.grid(row=row_idx, column=5, padx=5, pady=2)
 
-        # System state controls
-        tk.Label(self.root, text="System State:").grid(row=1, column=0, padx=5, pady=5)
+        # Row 1: System state
+        row_idx += 1
+        tk.Label(self.left_frame, text="System State:").grid(row=row_idx, column=0, padx=5, pady=2, sticky="e")
         self.state_var = tk.StringVar(value="SAFE")
-        self.state_dropdown = tk.OptionMenu(self.root, self.state_var, "SAFE", "ARMED", "ENGAGED")
-        self.state_dropdown.grid(row=1, column=1, padx=5, pady=5)
+        self.state_dropdown = tk.OptionMenu(self.left_frame, self.state_var, "SAFE", "ARMED", "ENGAGED")
+        self.state_dropdown.grid(row=row_idx, column=1, padx=5, pady=2)
 
-        self.send_state_button = tk.Button(self.root, text="Send State", command=self.send_state)
-        self.send_state_button.grid(row=1, column=2, padx=5, pady=5)
+        self.send_state_button = tk.Button(self.left_frame, text="Send State", command=self.send_state)
+        self.send_state_button.grid(row=row_idx, column=2, padx=5, pady=2)
 
-        # Command controls
-        tk.Label(self.root, text="Command:").grid(row=1, column=3, padx=5, pady=5)
-        self.command_entry = tk.Entry(self.root, width=30)
-        self.command_entry.grid(row=1, column=4, padx=5, pady=5)
+        # Row 1 (continued): Command
+        tk.Label(self.left_frame, text="Command:").grid(row=row_idx, column=3, padx=5, pady=2, sticky="e")
+        self.command_entry = tk.Entry(self.left_frame, width=20)
+        self.command_entry.grid(row=row_idx, column=4, padx=5, pady=2)
 
-        self.send_command_button = tk.Button(self.root, text="Send Command", command=self.send_command)
-        self.send_command_button.grid(row=1, column=5, padx=5, pady=5)
+        self.send_command_button = tk.Button(self.left_frame, text="Send Command", command=self.send_command)
+        self.send_command_button.grid(row=row_idx, column=5, padx=5, pady=2)
 
-        # Video display area
-        tk.Label(self.root, text="Video Stream:").grid(row=2, column=0, padx=5, pady=5)
-        self.video_label = tk.Label(self.root)
-        self.video_label.grid(row=3, column=0, columnspan=6, padx=5, pady=5)
+        # Row 2: Video label + FPS
+        row_idx += 1
+        tk.Label(self.left_frame, text="Video Stream:").grid(row=row_idx, column=0, padx=5, pady=2, sticky="w")
+        self.fps_label = tk.Label(self.left_frame, text="FPS: 0", font=("Arial", 10))
+        self.fps_label.grid(row=row_idx, column=5, padx=5, pady=2, sticky="e")
 
-        # FPS Display
-        self.fps_label = tk.Label(self.root, text="FPS: 0", font=("Arial", 12))
-        self.fps_label.grid(row=2, column=5, padx=5, pady=5, sticky="e")
+        # Row 3: The actual video feed
+        row_idx += 1
+        self.video_label = tk.Label(self.left_frame)
+        self.video_label.grid(row=row_idx, column=0, columnspan=6, padx=5, pady=5)
 
-        # Video stream controls
-        self.start_video_button = tk.Button(self.root, text="Start Video Stream", command=self.start_video_stream)
-        self.start_video_button.grid(row=4, column=0, padx=5, pady=5)
+        # Row 4: Video buttons + calibrate
+        row_idx += 1
+        self.start_video_button = tk.Button(self.left_frame, text="Start Video Stream", command=self.start_video_stream)
+        self.start_video_button.grid(row=row_idx, column=0, padx=5, pady=2)
 
         self.stop_video_button = tk.Button(
-            self.root, text="Stop Video Stream", command=self.stop_video_stream, state=tk.DISABLED
+            self.left_frame, text="Stop Video Stream", command=self.stop_video_stream, state=tk.DISABLED
         )
-        self.stop_video_button.grid(row=4, column=1, padx=5, pady=5)
+        self.stop_video_button.grid(row=row_idx, column=1, padx=5, pady=2)
 
-        self.save_video_button = tk.Button(self.root, text="Start Saving Video", command=self.start_saving_video)
-        self.save_video_button.grid(row=4, column=2, padx=5, pady=5)
+        self.save_video_button = tk.Button(self.left_frame, text="Start Saving Video", command=self.start_saving_video)
+        self.save_video_button.grid(row=row_idx, column=2, padx=5, pady=2)
 
         self.stop_saving_button = tk.Button(
-            self.root, text="Stop Saving Video", command=self.stop_saving_video, state=tk.DISABLED
+            self.left_frame, text="Stop Saving Video", command=self.stop_saving_video, state=tk.DISABLED
         )
-        self.stop_saving_button.grid(row=4, column=3, padx=5, pady=5)
+        self.stop_saving_button.grid(row=row_idx, column=3, padx=5, pady=2)
 
-        # Crosshair controls
-        tk.Label(self.root, text="Crosshair Controls:").grid(row=5, column=0, padx=5, pady=5)
-        tk.Button(self.root, text="Up", command=lambda: self.move_crosshair(0, -10)).grid(
-            row=5, column=2, padx=5, pady=5
-        )
-        tk.Button(self.root, text="Left", command=lambda: self.move_crosshair(-10, 0)).grid(
-            row=6, column=1, padx=5, pady=5
-        )
-        tk.Button(self.root, text="Reset", command=self.reset_crosshair).grid(row=6, column=2, padx=5, pady=5)
-        tk.Button(self.root, text="Right", command=lambda: self.move_crosshair(10, 0)).grid(
-            row=6, column=3, padx=5, pady=5
-        )
-        tk.Button(self.root, text="Down", command=lambda: self.move_crosshair(0, 10)).grid(
-            row=7, column=2, padx=5, pady=5
-        )
+        calibrate_check = tk.Checkbutton(self.left_frame, text="Calibrate", variable=self.calibrate_var)
+        calibrate_check.grid(row=row_idx, column=4, padx=5, pady=2)
 
-        # Log display
-        tk.Label(self.root, text="Log:").grid(row=8, column=0, padx=5, pady=5)
-        self.log_text = tk.Text(self.root, width=85, height=10, state=tk.DISABLED)
-        self.log_text.grid(row=9, column=0, columnspan=6, padx=5, pady=5)
+        # Row 5: Crosshair Controls
+        row_idx += 1
+        tk.Label(self.left_frame, text="Crosshair Controls:").grid(row=row_idx, column=0, padx=5, pady=5, sticky="w")
 
+        # Next row for crosshair buttons
+        row_idx += 1
+        tk.Button(self.left_frame, text="Up", command=lambda: self.move_crosshair(0, -10)).grid(
+            row=row_idx, column=1, pady=2
+        )
+        tk.Button(self.left_frame, text="Left", command=lambda: self.move_crosshair(-10, 0)).grid(
+            row=row_idx, column=0, pady=2
+        )
+        tk.Button(self.left_frame, text="Right", command=lambda: self.move_crosshair(10, 0)).grid(
+            row=row_idx, column=2, pady=2
+        )
+        tk.Button(self.left_frame, text="Down", command=lambda: self.move_crosshair(0, 10)).grid(
+            row=row_idx, column=3, pady=2
+        )
+        tk.Button(self.left_frame, text="Reset", command=self.reset_crosshair).grid(row=row_idx, column=4, pady=2)
+
+    def create_log_ui(self):
+        """
+        Put the Log label and Text widget in right_frame.
+        """
+        log_label = tk.Label(self.right_frame, text="Log:")
+        log_label.pack(anchor="nw", padx=5, pady=(0, 5))
+
+        self.log_text = tk.Text(self.right_frame, width=50, height=30, state=tk.DISABLED)
+        self.log_text.pack(fill="both", expand=True, padx=5, pady=5)
+
+    # --------------------------------------------------------------------------
+    # Networking/Commands
+    # --------------------------------------------------------------------------
     def connect_to_server(self):
         server_address = self.server_address_entry.get()
         server_port = int(self.server_port_entry.get())
@@ -156,6 +210,9 @@ class ClientControlApp:
         self.client.send_data(command.encode())
         self.log(f"Sent command: {command}")
 
+    # --------------------------------------------------------------------------
+    # Video Handling
+    # --------------------------------------------------------------------------
     def start_video_stream(self):
         if not self.client or not self.client.is_connected:
             messagebox.showerror("Error", "Not connected to the server.")
@@ -217,6 +274,9 @@ class ClientControlApp:
         if self.video_writer:
             self.video_writer.write(frame)
 
+    # --------------------------------------------------------------------------
+    # Video Recording
+    # --------------------------------------------------------------------------
     def start_saving_video(self):
         if self.video_writer is None:
             fourcc = cv2.VideoWriter_fourcc(*"XVID")
@@ -234,6 +294,9 @@ class ClientControlApp:
             self.save_video_button.config(state=tk.NORMAL)
             self.stop_saving_button.config(state=tk.DISABLED)
 
+    # --------------------------------------------------------------------------
+    # Crosshair
+    # --------------------------------------------------------------------------
     def reset_crosshair(self):
         self.crosshair_position = [320, 240]  # Reset to the center
         self.log("Reset crosshair to center.")
@@ -244,6 +307,74 @@ class ClientControlApp:
             self.crosshair_position[1] += dy
             self.log(f"Moved crosshair to: {self.crosshair_position}")
 
+    # --------------------------------------------------------------------------
+    # Keyboard Handlers (Optional)
+    # --------------------------------------------------------------------------
+    def on_key_press(self, event):
+        """
+        Example: If you want to replicate the turret/motion control:
+        (Assumes the server recognizes these commands.)
+        """
+        if not self.client or not self.client.is_connected:
+            return
+
+        key = event.keysym.lower()
+        calibrate_mode = self.calibrate_var.get()
+
+        send_code = None
+        if calibrate_mode:
+            if key == "j":
+                send_code = "CALIB_DEC_X"
+            elif key == "l":
+                send_code = "CALIB_INC_X"
+            elif key == "i":
+                send_code = "CALIB_INC_Y"
+            elif key == "m":
+                send_code = "CALIB_DEC_Y"
+        else:
+            if key == "j":
+                send_code = "PAN_LEFT_START"
+            elif key == "l":
+                send_code = "PAN_RIGHT_START"
+            elif key == "i":
+                send_code = "PAN_UP_START"
+            elif key == "m":
+                send_code = "PAN_DOWN_START"
+            elif key == "f":
+                send_code = "FIRE_START"
+
+        if send_code:
+            self.client.send_data(send_code.encode())
+            self.log(f"Key Pressed: {key} => {send_code}")
+
+    def on_key_release(self, event):
+        if not self.client or not self.client.is_connected:
+            return
+
+        # In calibrate mode, no STOP commands are sent (mirroring C++ logic).
+        if self.calibrate_var.get():
+            return
+
+        key = event.keysym.lower()
+        send_code = None
+        if key == "j":
+            send_code = "PAN_LEFT_STOP"
+        elif key == "l":
+            send_code = "PAN_RIGHT_STOP"
+        elif key == "i":
+            send_code = "PAN_UP_STOP"
+        elif key == "m":
+            send_code = "PAN_DOWN_STOP"
+        elif key == "f":
+            send_code = "FIRE_STOP"
+
+        if send_code:
+            self.client.send_data(send_code.encode())
+            self.log(f"Key Released: {key} => {send_code}")
+
+    # --------------------------------------------------------------------------
+    # Logging helper
+    # --------------------------------------------------------------------------
     def log(self, message):
         self.log_text.config(state=tk.NORMAL)
         self.log_text.insert(tk.END, message + "\n")
